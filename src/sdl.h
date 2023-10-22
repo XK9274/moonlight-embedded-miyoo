@@ -58,6 +58,7 @@ typedef struct {
     int inIPInput;
     int noPairStart;
     int unPairedNoti;
+    int exitNow;
     const char* entered_ip;
     char received_pin[5];
 } UIState;

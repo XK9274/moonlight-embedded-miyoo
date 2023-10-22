@@ -161,7 +161,7 @@ void sdl_ip_input(SDLContext *ctx, SDL_Rect text_box_rect) {
     text_rect.y = text_box_rect.y + (text_box_rect.h - text_surface->h) / 2;
     text_rect.w = text_surface->w;
     text_rect.h = text_surface->h;
-
+    
     SDL_Texture *text_texture = SDL_CreateTextureFromSurface(ctx->renderer, text_surface);
     SDL_RenderCopy(ctx->renderer, text_texture, NULL, &text_rect);
 
@@ -177,7 +177,7 @@ void sdl_ip_input_gui(SDLContext *ctx) {
     int text_box_height = 40;
     int text_box_x = (ctx->menu_surface->w - text_box_width) / 2;
     int text_box_y = (ctx->menu_surface->h - text_box_height) / 2;
-
+    
     SDL_Rect text_box_rect;
     text_box_rect.x = text_box_x;
     text_box_rect.y = text_box_y;
@@ -605,10 +605,15 @@ int sdl_menu(SDLContext *ctx) {
                         case SDLK_SPACE:
                             switch (selected_item) {
                                 case 0:
-                                    return 0;
+                                    if (ctx->state.noPairStart == 1) {
+                                        return 0;
+                                    } else {
+                                        sdl_banner(ctx, "Pair your device before trying to stream!", "orange");
+                                        // ctx->state.redrawAll = 1;
+                                        // ctx->state.redraw = 1;
+                                    }
                                     break;
                                 case 1:
-                                    sdl_banner(ctx, "IP input", "orange");
                                     selected_item = 0;
                                     ctx->state.inIPInput = 1;
                                     ctx->state.redrawAll = 1;
@@ -625,7 +630,9 @@ int sdl_menu(SDLContext *ctx) {
                                     ctx->state.inSettings = 1;
                                     break;
                                 case 4:
-                                    return 1;
+                                    cleanupSDLContext(ctx);
+                                    ctx->state.exitNow = 1;
+                                    exit(-1);
                                     break;
                                 case 5:
                                     sdl_banner(ctx, "Not active yet", "orange");
@@ -709,6 +716,11 @@ int sdl_menu(SDLContext *ctx) {
                 ctx->state.redraw = 0;
                 ctx->state.redrawAll = 0;
             }
+            
+        if (ctx->state.exitNow) {
+            break;
+        }
+        
         }
         
         SDL_Delay(25);
@@ -808,6 +820,11 @@ void sdl_loop(SDLContext *ctx) {
   SDL_SetRelativeMouseMode(SDL_TRUE);
 
   while(!done && SDL_WaitEvent(&event)) {
+    if (ctx->state.exitNow == 1) {
+        done = true;
+        break;
+    }
+
     switch (sdlinput_handle_event(ctx->window, &event)) {
     case SDL_QUIT_APPLICATION:
       done = true;

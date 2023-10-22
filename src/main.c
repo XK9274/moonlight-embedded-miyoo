@@ -359,8 +359,7 @@ int main(int argc, char* argv[]) {
       sdl_init(&ctx, config.stream.width, config.stream.height, config.fullscreen);
       int status = sdl_menu(&ctx);
       if (status == 1) {
-         exit(0);
-         
+         exit(-1);
       }
     }
     #endif
@@ -373,7 +372,7 @@ int main(int argc, char* argv[]) {
         char* mapping_env = getenv("SDL_GAMECONTROLLERCONFIG");
         if (config.mapping == NULL && mapping_env == NULL) {
           fprintf(stderr, "Please specify mapping file as default mapping could not be found.\n");
-          
+          cleanupSDLContext(&ctx);
           exit(-1);
         }
 
