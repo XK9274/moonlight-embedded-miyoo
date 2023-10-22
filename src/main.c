@@ -88,6 +88,7 @@ static void stream(PSERVER_DATA server, PCONFIGURATION config, enum platform sys
   int appId = get_app_id(server, config->app);
   if (appId<0) {
     fprintf(stderr, "Can't find app %s\n", config->app);
+    
     exit(-1);
   }
   
@@ -114,6 +115,7 @@ static void stream(PSERVER_DATA server, PCONFIGURATION config, enum platform sys
       fprintf(stderr, "Gamestream error: %s\n", gs_error);
     else
       fprintf(stderr, "Errorcode starting app: %d\n", ret);
+    
     exit(-1);
   }
 
@@ -252,11 +254,13 @@ int main(int argc, char* argv[]) {
   if (strcmp("map", config.action) == 0) {
     if (config.inputsCount != 1) {
       printf("You need to specify one input device using -input.\n");
+      
       exit(-1);
     }
 
     evdev_create(config.inputs[0], NULL, config.debug_level > 0, config.rotate);
     evdev_map(config.inputs[0]);
+    
     exit(0);
   }
 
@@ -264,6 +268,7 @@ int main(int argc, char* argv[]) {
     config.address = malloc(MAX_ADDRESS_SIZE);
     if (config.address == NULL) {
       perror("Not enough memory");
+      
       exit(-1);
     }
     config.address[0] = 0;
@@ -271,6 +276,7 @@ int main(int argc, char* argv[]) {
     gs_discover_server(config.address, &config.port);
     if (config.address[0] == 0) {
       fprintf(stderr, "Autodiscovery failed. Specify an IP address next time.\n");
+      
       exit(-1);
     }
   }
@@ -286,18 +292,23 @@ int main(int argc, char* argv[]) {
   int ret;
   if ((ret = gs_init(&server, config.address, config.port, config.key_dir, config.debug_level, config.unsupported)) == GS_OUT_OF_MEMORY) {
     fprintf(stderr, "Not enough memory\n");
+    
     exit(-1);
   } else if (ret == GS_ERROR) {
     fprintf(stderr, "Gamestream error: %s\n", gs_error);
+    
     exit(-1);
   } else if (ret == GS_INVALID) {
     fprintf(stderr, "Invalid data received from server: %s\n", gs_error);
+    
     exit(-1);
   } else if (ret == GS_UNSUPPORTED_VERSION) {
     fprintf(stderr, "Unsupported version: %s\n", gs_error);
+    
     exit(-1);
   } else if (ret != GS_OK) {
     fprintf(stderr, "Can't connect to server %s\n", config.address);
+    
     exit(-1);
   }
 
@@ -317,9 +328,11 @@ int main(int argc, char* argv[]) {
 
     if (system == 0) {
       fprintf(stderr, "Platform '%s' not found\n", config.platform);
+      
       exit(-1);
     } else if (system == SDL && config.audio_device != NULL) {
       fprintf(stderr, "You can't select a audio device for SDL\n");
+      
       exit(-1);
     }
 
@@ -337,6 +350,7 @@ int main(int argc, char* argv[]) {
 
     if (config.hdr && !(config.stream.supportedVideoFormats & VIDEO_FORMAT_MASK_10BIT)) {
       fprintf(stderr, "HDR streaming requires HEVC or AV1 codec\n");
+      
       exit(-1);
     }
 
@@ -346,6 +360,7 @@ int main(int argc, char* argv[]) {
       int status = sdl_menu(&ctx);
       if (status == 1) {
          exit(0);
+         
       }
     }
     #endif
@@ -358,6 +373,7 @@ int main(int argc, char* argv[]) {
         char* mapping_env = getenv("SDL_GAMECONTROLLERCONFIG");
         if (config.mapping == NULL && mapping_env == NULL) {
           fprintf(stderr, "Please specify mapping file as default mapping could not be found.\n");
+          
           exit(-1);
         }
 
@@ -389,6 +405,7 @@ int main(int argc, char* argv[]) {
       else if (system == SDL) {
         if (config.inputsCount > 0) {
           fprintf(stderr, "You can't select input devices as SDL will automatically use all available controllers\n");
+          
           exit(-1);
         }
 
