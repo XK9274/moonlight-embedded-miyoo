@@ -26,7 +26,6 @@
 
 #include "audio/audio.h"
 #include "video/video.h"
-
 #include "input/mapping.h"
 #include "input/evdev.h"
 #include "input/udev.h"
@@ -53,6 +52,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <openssl/rand.h>
+
+SDLContext ctx;
 
 static void applist(PSERVER_DATA server) {
   PAPP_LIST list = NULL;
@@ -89,6 +90,8 @@ static void stream(PSERVER_DATA server, PCONFIGURATION config, enum platform sys
     fprintf(stderr, "Can't find app %s\n", config->app);
     exit(-1);
   }
+  
+  fprintf(stderr, "User selected app: %d, and %s\n", appId, config->app);
 
   int gamepads = 0;
   gamepads += evdev_gamepads;
@@ -154,7 +157,7 @@ static void stream(PSERVER_DATA server, PCONFIGURATION config, enum platform sys
   }
   #ifdef HAVE_SDL
   else if (system == SDL)
-    sdl_loop();
+    sdl_loop(&ctx);
   #endif
 
   LiStopConnection();
@@ -164,6 +167,7 @@ static void stream(PSERVER_DATA server, PCONFIGURATION config, enum platform sys
       printf("Sending app quit request ...\n");
     gs_quit_app(server);
   }
+
 
   platform_stop(system);
 }
@@ -231,7 +235,7 @@ static void help() {
 static void pair_check(PSERVER_DATA server) {
   if (!server->paired) {
     fprintf(stderr, "You must pair with the PC first\n");
-    exit(-1);
+    ctx.state.noPairStart = 1;
   }
 }
 
@@ -337,8 +341,13 @@ int main(int argc, char* argv[]) {
     }
 
     #ifdef HAVE_SDL
-    if (system == SDL)
-      sdl_init(config.stream.width, config.stream.height, config.fullscreen);
+    if (system == SDL) {
+      sdl_init(&ctx, config.stream.width, config.stream.height, config.fullscreen);
+      int status = sdl_menu(&ctx);
+      if (status == 1) {
+         exit(0);
+      }
+    }
     #endif
 
     if (config.viewonly) {
@@ -391,7 +400,8 @@ int main(int argc, char* argv[]) {
       }
       #endif
     }
-
+    
+    sdl_splash(&ctx);
     stream(&server, &config, system);
   } else if (strcmp("pair", config.action) == 0) {
     char pin[5];
@@ -401,17 +411,22 @@ int main(int argc, char* argv[]) {
       sprintf(pin, "%d%d%d%d", (unsigned)random() % 10, (unsigned)random() % 10, (unsigned)random() % 10, (unsigned)random() % 10);
     }
     printf("Please enter the following PIN on the target PC: %s\n", pin);
+    
+    char bannerMessage[128];
+    snprintf(bannerMessage, sizeof(bannerMessage), "Enter the pin on the remote! %s", pin);
+    sdl_banner(&ctx, bannerMessage, "green");
+
     fflush(stdout);
     if (gs_pair(&server, &pin[0]) != GS_OK) {
       fprintf(stderr, "Failed to pair to server: %s\n", gs_error);
     } else {
-      printf("Succesfully paired\n");
+      printf("Successfully paired\n");
     }
   } else if (strcmp("unpair", config.action) == 0) {
     if (gs_unpair(&server) != GS_OK) {
       fprintf(stderr, "Failed to unpair to server: %s\n", gs_error);
     } else {
-      printf("Succesfully unpaired\n");
+      printf("Successfully unpaired\n");
     }
   } else if (strcmp("quit", config.action) == 0) {
     pair_check(&server);

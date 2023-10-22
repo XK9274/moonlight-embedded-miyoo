@@ -20,6 +20,8 @@
 #ifdef HAVE_SDL
 
 #include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
 
 #include <stdbool.h>
 
@@ -33,8 +35,43 @@
 
 #define SDL_BUFFER_FRAMES 2
 
-void sdl_init(int width, int height, bool fullscreen);
-void sdl_loop();
+#define SPLASH_PATH "/mnt/SDCARD/App/moonlight/res/splash"
+#define MIYOO_VERSION "1.3"
+#define TOP_BANNER "/mnt/SDCARD/App/moonlight/res/icon/top_banner.png"
+#define MOONLIGHT_FONT "/mnt/SDCARD/miyoo/app/Helvetica-Neue-2.ttf"
+
+#define MAX_ITEMS 6
+#define ROWS 2
+#define COLUMNS 3
+
+typedef struct {
+    int redraw;
+    int redrawAll;
+    int inSettings;
+    int noPairStart;
+    int unPairedNoti;
+} UIState;
+
+typedef struct SDLContext {
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *bmp;
+    SDL_mutex *mutex;
+    SDL_Surface *menu_surface;
+    SDL_Texture *menu_texture;
+    TTF_Font *font;
+    int sdlCurrentFrame, sdlNextFrame;
+    bool fullscreen;
+    UIState state;
+} SDLContext;
+
+void sdl_init(SDLContext *ctx, int width, int height, bool fullscreen);
+void sdl_banner(SDLContext *ctx, const char *text, const char *color);
+void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int selected, int index, const char* text);
+int sdl_menu(SDLContext *ctx);
+void sdl_unpair(SDLContext *ctx, const char *IPADDR);
+void sdl_loop(SDLContext *ctx);
+void sdl_splash(SDLContext *ctx);
 
 extern SDL_mutex *mutex;
 extern int sdlCurrentFrame, sdlNextFrame;

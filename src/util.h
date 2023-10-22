@@ -20,6 +20,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define MOONLIGHT_DIR "/mnt/SDCARD/App/moonlight"
+
+void is_file_exist_and_remove(const char *filepath);
+void is_dir_exist_and_remove(const char *dirpath);
 int write_bool(char *path, bool val);
 int read_file(char *path, char *output, int output_len);
 bool ensure_buf_size(void **buf, size_t *buf_size, size_t required_size);

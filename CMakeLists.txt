@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.1)
 project(moonlight-embedded VERSION 2.6.1 LANGUAGES C)
-SET(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-SET(CMAKE_C_STANDARD 99)
 include(${CMAKE_ROOT}/Modules/GNUInstallDirs.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/generate_version_header.cmake)
 
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+set(CMAKE_C_STANDARD 99)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-undef -Os -marm -mtune=cortex-a7 -mfpu=neon-vfpv4 -march=armv7ve+simd -mfloat-abi=hard -ffunction-sections -fdata-sections -I/usr")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s -O3 -fPIC -pthread")
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-pointer-sign -Wno-sign-compare -Wno-switch)
 
 aux_source_directory(./src SRC_LIST)
@@ -18,6 +21,7 @@ find_package(Broadcom-OMX)
 find_package(Freescale)
 find_package(Amlogic)
 find_package(Rockchip)
+find_package(PNG REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 
@@ -31,7 +35,10 @@ pkg_check_modules(EVDEV REQUIRED libevdev)
 pkg_check_modules(UDEV REQUIRED libudev)
 if (ENABLE_SDL)
   pkg_check_modules(SDL sdl2>=2.0.4)
+  pkg_check_modules(SDL_IMAGE SDL2_image>=2.0.0)
+  pkg_check_modules(SDL2_TTF SDL2_ttf>=2.0.14)
 endif()
+
 if (ENABLE_FFMPEG)
   pkg_check_modules(AVCODEC libavcodec)
   pkg_check_modules(AVUTIL libavutil)
@@ -205,8 +212,26 @@ endif()
 configure_file("./src/configuration.h.in" "${PROJECT_BINARY_DIR}/configuration.h")
 
 set_property(TARGET moonlight PROPERTY COMPILE_DEFINITIONS ${MOONLIGHT_DEFINITIONS})
-target_include_directories(moonlight PRIVATE ${GAMESTREAM_INCLUDE_DIR} ${MOONLIGHT_COMMON_INCLUDE_DIR} ${OPUS_INCLUDE_DIRS} ${EVDEV_INCLUDE_DIRS} ${UDEV_INCLUDE_DIRS})
-target_link_libraries(moonlight ${EVDEV_LIBRARIES} ${OPUS_LIBRARY} ${UDEV_LIBRARIES} ${CMAKE_DL_LIBS})
+target_include_directories(moonlight PRIVATE 
+    ${GAMESTREAM_INCLUDE_DIR} 
+    ${MOONLIGHT_COMMON_INCLUDE_DIR} 
+    ${OPUS_INCLUDE_DIRS} 
+    ${EVDEV_INCLUDE_DIRS} 
+    ${UDEV_INCLUDE_DIRS} 
+    ${PNG_INCLUDE_DIR}
+    ${SDL_IMAGE_INCLUDE_DIRS}
+    ${SDL2_TTF_INCLUDE_DIRS}
+)
+
+target_link_libraries(moonlight 
+    ${EVDEV_LIBRARIES} 
+    ${OPUS_LIBRARY} 
+    ${UDEV_LIBRARIES} 
+    ${CMAKE_DL_LIBS} 
+    ${PNG_LIBRARY}
+    ${SDL_IMAGE_LIBRARIES}
+    ${SDL2_TTF_LIBRARIES}
+)
 
 add_subdirectory(docs)
 
