@@ -260,7 +260,7 @@ static int decoder_renderer_submit_decode_unit(PDECODE_UNIT decodeUnit) {
         mmal_buffer_header_release(buf);
         return DR_NEED_IDR;
       }
-      memcpy(buf->data + buf->length, entry->data, entry->length);
+      neon_memcpy(buf->data + buf->length, entry->data, entry->length);
       buf->length += entry->length;
     }
 

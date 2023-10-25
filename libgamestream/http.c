@@ -37,7 +37,7 @@ static size_t _write_curl(void *contents, size_t size, size_t nmemb, void *userp
   if(mem->memory == NULL)
     return 0;
 
-  memcpy(&(mem->memory[mem->size]), contents, realsize);
+  neon_memcpy(&(mem->memory[mem->size]), contents, realsize);
   mem->size += realsize;
   mem->memory[mem->size] = 0;
 

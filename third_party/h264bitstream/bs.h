@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+void neon_memcpy(void *dest, const void *src, size_t n);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -333,7 +335,7 @@ static inline int bs_read_bytes(bs_t* b, uint8_t* buf, int len)
     int actual_len = len;
     if (b->end - b->p < actual_len) { actual_len = b->end - b->p; }
     if (actual_len < 0) { actual_len = 0; }
-    memcpy(buf, b->p, actual_len);
+    neon_memcpy(buf, b->p, actual_len);
     if (len < 0) { len = 0; }
     b->p += len;
     return actual_len;
@@ -344,7 +346,7 @@ static inline int bs_write_bytes(bs_t* b, uint8_t* buf, int len)
     int actual_len = len;
     if (b->end - b->p < actual_len) { actual_len = b->end - b->p; }
     if (actual_len < 0) { actual_len = 0; }
-    memcpy(b->p, buf, actual_len);
+    neon_memcpy(b->p, buf, actual_len);
     if (len < 0) { len = 0; }
     b->p += len;
     return actual_len;

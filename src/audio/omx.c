@@ -49,7 +49,7 @@ static int omx_renderer_init(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURA
    * OMX expects the order: FL-FR-LFE-C-RL-RR-SL-SR
    * We need copy the mapping locally and swap the channels around.
    */
-  memcpy(omxMapping, opusConfig->mapping, sizeof(omxMapping));
+  neon_memcpy(omxMapping, opusConfig->mapping, sizeof(omxMapping));
   if (opusConfig->channelCount > 2) {
     omxMapping[2] = opusConfig->mapping[3];
     omxMapping[3] = opusConfig->mapping[2];
@@ -197,7 +197,7 @@ static void omx_renderer_decode_and_play_sample(char* data, int length) {
     buf->nOffset = 0;
     buf->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
     int bufLength = decodeLen * sizeof(short) * channelCount;
-    memcpy(buf->pBuffer, pcmBuffer, bufLength);
+    neon_memcpy(buf->pBuffer, pcmBuffer, bufLength);
     buf->nFilledLen = bufLength;
     int r = OMX_EmptyThisBuffer(ilclient_get_handle(component), buf);
     if (r != OMX_ErrorNone) {

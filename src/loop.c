@@ -84,8 +84,8 @@ void loop_remove_fd(int fd) {
   }
 
   if (fdindex != numFds && numFds > 0) {
-    memcpy(&fds[fdindex], &fds[numFds], sizeof(struct pollfd));
-    memcpy(&fdHandlers[fdindex], &fdHandlers[numFds], sizeof(FdHandler));
+    neon_memcpy(&fds[fdindex], &fds[numFds], sizeof(struct pollfd));
+    neon_memcpy(&fdHandlers[fdindex], &fdHandlers[numFds], sizeof(FdHandler));
   }
 }
 

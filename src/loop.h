@@ -17,6 +17,8 @@
  * along with Moonlight; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <pthread.h>
+
 #define LOOP_RETURN 1
 #define LOOP_OK 0
 

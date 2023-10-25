@@ -1,3 +1,6 @@
+#ifndef MOONLIGHT_SDL_HEADER_H
+#define MOONLIGHT_SDL_HEADER_H
+
 /*
  * This file is part of Moonlight Embedded.
  *
@@ -20,6 +23,9 @@
 #ifdef HAVE_SDL
 
 #include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
+#include "input/sdl.h"
 
 #include <stdbool.h>
 
@@ -33,10 +39,63 @@
 
 #define SDL_BUFFER_FRAMES 2
 
-void sdl_init(int width, int height, bool fullscreen);
-void sdl_loop();
+#define SPLASH_PATH "/mnt/SDCARD/App/moonlight/res/splash"
+#define MIYOO_VERSION "1.3"
+#define TOP_BANNER "/mnt/SDCARD/App/moonlight/res/icon/top_banner.png"
+#define MOONLIGHT_FONT "/mnt/SDCARD/miyoo/app/Helvetica-Neue-2.ttf"
+#define MOONLIGHT_DIR "/mnt/SDCARD/App/moonlight"
+
+#define MAX_ITEMS 6
+#define ROWS 2
+#define COLUMNS 3
+
+#define BIG_COL 5
+#define BIG_ROW 5
+#define MAX_IP_TILES 15
+#define MAX_IP_LEN 16 
+
+typedef struct {
+    int redraw;
+    int redrawAll;
+    int inSettings;
+    int inIPInput;
+    int noPairStart;
+    int unPairedNoti;
+    int exitNow;
+    int inAppMenu;
+    int currentColumns;
+    char* entered_ip;
+    char received_pin[5];
+    char ip_address_from_file[MAX_IP_LEN];
+} UIState;
+
+typedef struct SDLContext {
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *bmp;
+    SDL_mutex *mutex;
+    SDL_Surface *menu_surface;
+    SDL_Texture *menu_texture;
+    TTF_Font *font;
+    int sdlCurrentFrame, sdlNextFrame;
+    bool fullscreen;
+    UIState state;
+} SDLContext;
+
+extern SDLContext ctx;
+
+void sdl_init(SDLContext *ctx, int width, int height, bool fullscreen);
+void sdl_banner(SDLContext *ctx, const char *format, const char *color, ...);
+void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int selected, int index, const char **labels, int numItems, int font_size, int isAppSelection);
+int sdl_menu(SDLContext *ctx);
+void sdl_unpair(SDLContext *ctx, const char *IPADDR);
+void sdl_loop(SDLContext *ctx);
+void sdl_splash(SDLContext *ctx);
+void cleanupSDLContext(SDLContext *ctx);
 
 extern SDL_mutex *mutex;
 extern int sdlCurrentFrame, sdlNextFrame;
 
 #endif /* HAVE_SDL */
+
+#endif /* MOONLIGHT_SDL_HEADER_H */

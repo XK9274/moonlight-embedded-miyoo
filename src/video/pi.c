@@ -240,7 +240,7 @@ static int decoder_renderer_submit_decode_unit(PDECODE_UNIT decodeUnit) {
     if (entry->bufferType == BUFFER_TYPE_SPS)
       gs_sps_fix(entry, GS_SPS_BITSTREAM_FIXUP, buf->pBuffer, &buf->nFilledLen);
     else {
-      memcpy(buf->pBuffer + buf->nFilledLen, entry->data, entry->length);
+      neon_memcpy(buf->pBuffer + buf->nFilledLen, entry->data, entry->length);
       buf->nFilledLen += entry->length;
     }
 

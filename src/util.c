@@ -26,6 +26,33 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+void remove_spaces(char *str) {
+    char *src = str, *dst = str;
+    while (*src != '\0') {
+        if (*src != ' ') {
+            *dst = *src;
+            dst++;
+        }
+        src++;
+    }
+    *dst = '\0';
+}
+
+
+void is_file_exist_and_remove(const char *filepath) {
+    if (access(filepath, F_OK) != -1) {
+        remove(filepath);
+    }
+}
+
+void is_dir_exist_and_remove(const char *dirpath) {
+    if (access(dirpath, F_OK) != -1) {
+        char command[256];
+        snprintf(command, sizeof(command), "rm -rf %s", dirpath);
+        system(command);
+    }
+}
+
 int write_bool(char *path, bool val) {
   int fd = open(path, O_RDWR);
 

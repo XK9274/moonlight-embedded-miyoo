@@ -332,7 +332,7 @@ void read_seq_parameter_set_rbsp(h264_stream_t* h, bs_t* b)
 
     if( 1 )
     {
-        memcpy(h->sps_table[sps->seq_parameter_set_id], h->sps, sizeof(sps_t));
+        neon_memcpy(h->sps_table[sps->seq_parameter_set_id], h->sps, sizeof(sps_t));
     }
 }
 
@@ -582,7 +582,7 @@ void read_pic_parameter_set_rbsp(h264_stream_t* h, bs_t* b)
 
     if( 1 )
     {
-        memcpy(h->pps, h->pps_table[pps->pic_parameter_set_id], sizeof(pps_t));
+        neon_memcpy(h->pps, h->pps_table[pps->pic_parameter_set_id], sizeof(pps_t));
     }
 }
 
@@ -678,7 +678,7 @@ void read_slice_layer_rbsp(h264_stream_t* h,  bs_t* b)
         slice_data->rbsp_size = b->end - sptr;
         
         slice_data->rbsp_buf = (uint8_t*)malloc(slice_data->rbsp_size);
-        memcpy( slice_data->rbsp_buf, sptr, slice_data->rbsp_size );
+        neon_memcpy( slice_data->rbsp_buf, sptr, slice_data->rbsp_size );
         // ugly hack: since next NALU starts at byte border, we are going to be padded by trailing_bits;
         return;
     }
@@ -759,8 +759,8 @@ void read_slice_header(h264_stream_t* h, bs_t* b)
     // TODO check existence, otherwise fail
     pps_t* pps = h->pps;
     sps_t* sps = h->sps;
-    memcpy(h->pps_table[sh->pic_parameter_set_id], h->pps, sizeof(pps_t));
-    memcpy(h->sps_table[pps->seq_parameter_set_id], h->sps, sizeof(sps_t));
+    neon_memcpy(h->pps_table[sh->pic_parameter_set_id], h->pps, sizeof(pps_t));
+    neon_memcpy(h->sps_table[pps->seq_parameter_set_id], h->sps, sizeof(sps_t));
 
     sh->frame_num = bs_read_u(b, sps->log2_max_frame_num_minus4 + 4 ); // was u(v)
     if( !sps->frame_mbs_only_flag )
@@ -1219,7 +1219,7 @@ void write_seq_parameter_set_rbsp(h264_stream_t* h, bs_t* b)
 
     if( 0 )
     {
-        memcpy(h->sps_table[sps->seq_parameter_set_id], h->sps, sizeof(sps_t));
+        neon_memcpy(h->sps_table[sps->seq_parameter_set_id], h->sps, sizeof(sps_t));
     }
 }
 
@@ -1469,7 +1469,7 @@ void write_pic_parameter_set_rbsp(h264_stream_t* h, bs_t* b)
 
     if( 0 )
     {
-        memcpy(h->pps, h->pps_table[pps->pic_parameter_set_id], sizeof(pps_t));
+        neon_memcpy(h->pps, h->pps_table[pps->pic_parameter_set_id], sizeof(pps_t));
     }
 }
 
@@ -1565,7 +1565,7 @@ void write_slice_layer_rbsp(h264_stream_t* h,  bs_t* b)
         slice_data->rbsp_size = b->end - sptr;
         
         slice_data->rbsp_buf = (uint8_t*)malloc(slice_data->rbsp_size);
-        memcpy( slice_data->rbsp_buf, sptr, slice_data->rbsp_size );
+        neon_memcpy( slice_data->rbsp_buf, sptr, slice_data->rbsp_size );
         // ugly hack: since next NALU starts at byte border, we are going to be padded by trailing_bits;
         return;
     }
@@ -1646,8 +1646,8 @@ void write_slice_header(h264_stream_t* h, bs_t* b)
     // TODO check existence, otherwise fail
     pps_t* pps = h->pps;
     sps_t* sps = h->sps;
-    memcpy(h->pps_table[sh->pic_parameter_set_id], h->pps, sizeof(pps_t));
-    memcpy(h->sps_table[pps->seq_parameter_set_id], h->sps, sizeof(sps_t));
+    neon_memcpy(h->pps_table[sh->pic_parameter_set_id], h->pps, sizeof(pps_t));
+    neon_memcpy(h->sps_table[pps->seq_parameter_set_id], h->sps, sizeof(sps_t));
 
     bs_write_u(b, sps->log2_max_frame_num_minus4 + 4 , sh->frame_num); // was u(v)
     if( !sps->frame_mbs_only_flag )

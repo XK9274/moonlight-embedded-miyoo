@@ -111,7 +111,7 @@ char* get_path(char* name, char* extra_data_dirs) {
   do {
     end = strstr(data_dir, ":");
     int length = end != NULL ? end - data_dir:strlen(data_dir);
-    memcpy(path, data_dir, length);
+    neon_memcpy(path, data_dir, length);
     if (path[0] == '/')
       sprintf(path+length, MOONLIGHT_PATH "/%s", name);
     else
@@ -331,24 +331,26 @@ void config_save(char* filename, PCONFIGURATION config) {
   if (config->rotate != 0)
     write_config_int(fd, "rotate", config->rotate);
 
+  if (config->address)
+    write_config_string(fd, "address", config->address); 
   if (strcmp(config->app, "Steam") != 0)
     write_config_string(fd, "app", config->app);
 
   fclose(fd);
 }
 
-void config_parse(int argc, char* argv[], PCONFIGURATION config) {
-  LiInitializeStreamConfiguration(&config->stream);
+void config_default() {
+   LiInitializeStreamConfiguration(&config.stream);
 
-  config->stream.width = 1280;
-  config->stream.height = 720;
-  config->stream.fps = 60;
-  config->stream.bitrate = -1;
-  config->stream.packetSize = 1392;
-  config->stream.streamingRemotely = STREAM_CFG_AUTO;
-  config->stream.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
-  config->stream.supportedVideoFormats = SCM_H264;
-  config->stream.encryptionFlags = ENCFLG_AUDIO;
+  config.stream.width = 1280;
+  config.stream.height = 720;
+  config.stream.fps = 60;
+  config.stream.bitrate = -1;
+  config.stream.packetSize = 1392;
+  config.stream.streamingRemotely = STREAM_CFG_AUTO;
+  config.stream.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
+  config.stream.supportedVideoFormats = SCM_H264;
+  config.stream.encryptionFlags = ENCFLG_AUDIO;
 
 #ifdef __arm__
   char cpuinfo[4096] = {};
@@ -357,86 +359,72 @@ void config_parse(int argc, char* argv[], PCONFIGURATION config) {
     // powerful enough to handle audio encryption. The Pi 1 could
     // barely handle Opus decoding alone.
     if (strstr(cpuinfo, "ARMv6")) {
-      config->stream.encryptionFlags = ENCFLG_NONE;
+      config.stream.encryptionFlags = ENCFLG_NONE;
       printf("Disabling audio encryption on low performance CPU\n");
     }
   }
 #endif
 
-  config->debug_level = 0;
-  config->platform = "auto";
-  config->app = "Steam";
-  config->action = NULL;
-  config->address = NULL;
-  config->config_file = NULL;
-  config->audio_device = NULL;
-  config->sops = true;
-  config->localaudio = false;
-  config->fullscreen = true;
-  config->unsupported = true;
-  config->quitappafter = false;
-  config->viewonly = false;
-  config->mouse_emulation = true;
-  config->rotate = 0;
-  config->codec = CODEC_UNSPECIFIED;
-  config->hdr = false;
-  config->pin = 0;
-  config->port = 47989;
+  config.debug_level = 0;
+  config.platform = "auto";
+  config.app = "Steam";
+  config.action = NULL;
+  config.address = NULL;
+  config.config_file = NULL;
+  config.audio_device = NULL;
+  config.sops = true;
+  config.localaudio = false;
+  config.fullscreen = true;
+  config.unsupported = true;
+  config.quitappafter = false;
+  config.viewonly = false;
+  config.mouse_emulation = true;
+  config.rotate = 0;
+  config.codec = CODEC_UNSPECIFIED;
+  config.hdr = false;
+  config.pin = 0;
+  config.port = 47989;
 
-  config->inputsCount = 0;
-  config->mapping = get_path("gamecontrollerdb.txt", getenv("XDG_DATA_DIRS"));
-  config->key_dir[0] = 0;
+  config.inputsCount = 0;
+  config.mapping = get_path("gamecontrollerdb.txt", getenv("XDG_DATA_DIRS"));
+  config.key_dir[0] = 0;
 
-  char* config_file = get_path("moonlight.conf", "/etc");
-  if (config_file)
-    config_file_parse(config_file, config);
+  config_file_parse(MOONLIGHT_CONF, &config);
 
-  if (argc == 2 && access(argv[1], F_OK) == 0) {
-    config->action = "stream";
-    if (!config_file_parse(argv[1], config))
-      exit(EXIT_FAILURE);
+  if (config.config_file != NULL)
+    config_save(config.config_file, &config);
 
-  } else {
-    int option_index = 0;
-    int c;
-    while ((c = getopt_long_only(argc, argv, "-abc:d:efg:h:i:j:k:lm:no:p:q:r:s:tu:v:w:xy45:6:7", long_options, &option_index)) != -1) {
-      parse_argument(c, optarg, config);
-    }
-  }
-
-  if (config->config_file != NULL)
-    config_save(config->config_file, config);
-
-  if (config->key_dir[0] == 0x0) {
+  if (config.key_dir[0] == 0x0) {
     struct passwd *pw = getpwuid(getuid());
     const char *dir;
     if ((dir = getenv("XDG_CACHE_DIR")) != NULL)
-      sprintf(config->key_dir, "%s" MOONLIGHT_PATH, dir);
+      sprintf(config.key_dir, "%s" MOONLIGHT_PATH, dir);
     else if ((dir = getenv("HOME")) != NULL)
-      sprintf(config->key_dir, "%s" DEFAULT_CACHE_DIR MOONLIGHT_PATH, dir);
+      sprintf(config.key_dir, "%s" DEFAULT_CACHE_DIR MOONLIGHT_PATH, dir);
     else
-      sprintf(config->key_dir, "%s" DEFAULT_CACHE_DIR MOONLIGHT_PATH, pw->pw_dir);
+      sprintf(config.key_dir, "%s" DEFAULT_CACHE_DIR MOONLIGHT_PATH, pw->pw_dir);
   }
-
-  if (config->stream.bitrate == -1) {
+  
+    if (config.stream.bitrate == -1) {
     // This table prefers 16:10 resolutions because they are
     // only slightly more pixels than the 16:9 equivalents, so
     // we don't want to bump those 16:10 resolutions up to the
     // next 16:9 slot.
 
-    if (config->stream.width * config->stream.height <= 640 * 360) {
-      config->stream.bitrate = (int)(1000 * (config->stream.fps / 30.0));
-    } else if (config->stream.width * config->stream.height <= 854 * 480) {
-      config->stream.bitrate = (int)(1500 * (config->stream.fps / 30.0));
-    } else if (config->stream.width * config->stream.height <= 1366 * 768) {
+    if (config.stream.width * config.stream.height <= 640 * 360) {
+      config.stream.bitrate = (int)(1000 * (config.stream.fps / 30.0));
+    } else if (config.stream.width * config.stream.height <= 854 * 480) {
+      config.stream.bitrate = (int)(1500 * (config.stream.fps / 30.0));
+    } else if (config.stream.width * config.stream.height <= 1366 * 768) {
       // This covers 1280x720 and 1280x800 too
-      config->stream.bitrate = (int)(5000 * (config->stream.fps / 30.0));
-    } else if (config->stream.width * config->stream.height <= 1920 * 1200) {
-      config->stream.bitrate = (int)(10000 * (config->stream.fps / 30.0));
-    } else if (config->stream.width * config->stream.height <= 2560 * 1600) {
-      config->stream.bitrate = (int)(20000 * (config->stream.fps / 30.0));
-    } else /* if (config->stream.width * config->stream.height <= 3840 * 2160) */ {
-      config->stream.bitrate = (int)(40000 * (config->stream.fps / 30.0));
+      config.stream.bitrate = (int)(5000 * (config.stream.fps / 30.0));
+    } else if (config.stream.width * config.stream.height <= 1920 * 1200) {
+      config.stream.bitrate = (int)(10000 * (config.stream.fps / 30.0));
+    } else if (config.stream.width * config.stream.height <= 2560 * 1600) {
+      config.stream.bitrate = (int)(20000 * (config.stream.fps / 30.0));
+    } else /* if (config.stream.width * config.stream.height <= 3840 * 2160) */ {
+      config.stream.bitrate = (int)(40000 * (config.stream.fps / 30.0));
     }
   }
+
 }
