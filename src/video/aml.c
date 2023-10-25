@@ -180,7 +180,7 @@ int aml_submit_decode_unit(PDECODE_UNIT decodeUnit) {
   int written = 0, length = 0, errCounter = 0, api;
   PLENTRY entry = decodeUnit->bufferList;
   do {
-    memcpy(pkt_buf+length, entry->data, entry->length);
+    neon_memcpy(pkt_buf+length, entry->data, entry->length);
     length += entry->length;
     entry = entry->next;
   } while (entry != NULL);

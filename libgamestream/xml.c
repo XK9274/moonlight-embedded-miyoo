@@ -25,6 +25,8 @@
 
 #define STATUS_OK 200
 
+void neon_memcpy(void *dest, const void *src, size_t n);
+
 struct xml_query {
   char *memory;
   size_t size;
@@ -131,7 +133,7 @@ static void XMLCALL _xml_write_data(void *userData, const XML_Char *s, int len) 
     if(search->memory == NULL)
       return;
 
-    memcpy(&(search->memory[search->size]), s, len);
+    neon_memcpy(&(search->memory[search->size]), s, len);
     search->size += len;
     search->memory[search->size] = 0;
   }

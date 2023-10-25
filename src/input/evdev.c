@@ -175,7 +175,7 @@ static void evdev_remove(int devindex) {
   close(devices[devindex].fd);
 
   if (devindex != numDevices && numDevices > 0)
-    memcpy(&devices[devindex], &devices[numDevices], sizeof(struct input_device));
+    neon_memcpy(&devices[devindex], &devices[numDevices], sizeof(struct input_device));
 }
 
 static short evdev_convert_value(struct input_event *ev, struct input_device *dev, struct input_abs_parms *parms, bool reverse) {

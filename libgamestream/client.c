@@ -476,8 +476,8 @@ int gs_pair(PSERVER_DATA server, char* pin) {
 
   unsigned char salt_pin[sizeof(salt_data) + 4];
   unsigned char aes_key[32]; // Must fit SHA256
-  memcpy(salt_pin, salt_data, sizeof(salt_data));
-  memcpy(salt_pin+sizeof(salt_data), pin, 4);
+  neon_memcpy(salt_pin, salt_data, sizeof(salt_data));
+  neon_memcpy(salt_pin+sizeof(salt_data), pin, 4);
 
   int hash_length = server->serverMajorVersion >= 7 ? 32 : 20;
   if (server->serverMajorVersion >= 7)
@@ -543,9 +543,9 @@ int gs_pair(PSERVER_DATA server, char* pin) {
   char challenge_response_hash[32];
   char challenge_response_hash_enc[sizeof(challenge_response_hash)];
   char challenge_response_hex[SIZEOF_AS_HEX_STR(challenge_response_hash_enc)];
-  memcpy(challenge_response, challenge_response_data + hash_length, 16);
-  memcpy(challenge_response + 16, asnSignature->data, asnSignature->length);
-  memcpy(challenge_response + 16 + asnSignature->length, client_secret_data, sizeof(client_secret_data));
+  neon_memcpy(challenge_response, challenge_response_data + hash_length, 16);
+  neon_memcpy(challenge_response + 16, asnSignature->data, asnSignature->length);
+  neon_memcpy(challenge_response + 16 + asnSignature->length, client_secret_data, sizeof(client_secret_data));
   if (server->serverMajorVersion >= 7)
     SHA256(challenge_response, 16 + asnSignature->length + sizeof(client_secret_data), challenge_response_hash);
   else
@@ -608,8 +608,8 @@ int gs_pair(PSERVER_DATA server, char* pin) {
 
   char client_pairing_secret[sizeof(client_secret_data) + SIGNATURE_LEN];
   char client_pairing_secret_hex[SIZEOF_AS_HEX_STR(client_pairing_secret)];
-  memcpy(client_pairing_secret, client_secret_data, sizeof(client_secret_data));
-  memcpy(client_pairing_secret + sizeof(client_secret_data), signature, SIGNATURE_LEN);
+  neon_memcpy(client_pairing_secret, client_secret_data, sizeof(client_secret_data));
+  neon_memcpy(client_pairing_secret + sizeof(client_secret_data), signature, SIGNATURE_LEN);
   bytes_to_hex(client_pairing_secret, client_pairing_secret_hex, sizeof(client_secret_data) + SIGNATURE_LEN);
 
   uuid_generate_random(uuid);
@@ -710,6 +710,8 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION *config, int appId, b
 
     mode = mode->next;
   }
+  
+  fprintf(stderr, "Starting app with appId: %d\n", appId);
 
   if (!correct_mode && !server->unsupported)
     return GS_NOT_SUPPORTED_MODE;
@@ -720,7 +722,7 @@ int gs_start_app(PSERVER_DATA server, STREAM_CONFIGURATION *config, int appId, b
   char url[4096];
   u_int32_t rikeyid = 0;
   RAND_bytes(config->remoteInputAesIv, sizeof(rikeyid));
-  memcpy(&rikeyid, config->remoteInputAesIv, sizeof(rikeyid));
+  neon_memcpy(&rikeyid, config->remoteInputAesIv, sizeof(rikeyid));
   rikeyid = htonl(rikeyid);
   char rikey_hex[SIZEOF_AS_HEX_STR(config->remoteInputAesKey)];
   bytes_to_hex(config->remoteInputAesKey, rikey_hex, sizeof(config->remoteInputAesKey));

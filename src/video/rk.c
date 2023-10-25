@@ -636,7 +636,7 @@ int rk_submit_decode_unit(PDECODE_UNIT decodeUnit) {
   }
 
   while (entry != NULL) {
-    memcpy(pkt_buf+length, entry->data, entry->length);
+    neon_memcpy(pkt_buf+length, entry->data, entry->length);
     length += entry->length;
     entry = entry->next;
   }

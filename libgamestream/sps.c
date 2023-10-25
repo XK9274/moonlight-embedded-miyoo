@@ -76,7 +76,7 @@ void gs_sps_fix(PLENTRY sps, int flags, uint8_t* out_buf, uint32_t* out_offset) 
     h264_stream->sps->vui.max_bits_per_mb_denom = 1;
   }
 
-  memcpy(out_buf+*out_offset, sps->data, start_len);
+  neon_memcpy(out_buf+*out_offset, sps->data, start_len);
   *out_offset += start_len;
 
   *out_offset += write_nal_unit(h264_stream, out_buf+*out_offset, 128);

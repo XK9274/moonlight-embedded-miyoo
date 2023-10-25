@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.1)
 project(moonlight-embedded VERSION 2.6.1 LANGUAGES C)
 include(${CMAKE_ROOT}/Modules/GNUInstallDirs.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/generate_version_header.cmake)
-
+enable_language(ASM)
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 set(CMAKE_C_STANDARD 99)
 
@@ -11,7 +11,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s -O3 -fPIC -pthread")
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-pointer-sign -Wno-sign-compare -Wno-switch)
 
 aux_source_directory(./src SRC_LIST)
-list(APPEND SRC_LIST ./src/input/evdev.c ./src/input/mapping.c ./src/input/udev.c)
+list(APPEND SRC_LIST ./src/input/evdev.c ./src/input/mapping.c ./src/input/udev.c ./src/neon.S)
 
 set(MOONLIGHT_DEFINITIONS)
 

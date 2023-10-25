@@ -718,26 +718,22 @@ int sdl_menu(SDLContext *ctx) {
 
                 if (!ctx->state.inSettings && !ctx->state.inIPInput && !ctx->state.inAppMenu) {
                     printf("Debug: In main menu.\n");
-                    selected_item = 0;
                     for (int i = 0; i < 6; ++i) {
                         sdl_tile(ctx, ctx->menu_surface, COLUMNS, ROWS, selected_item, i, (char **)menu_texts, 6, 24, 0);
                     }
                 } else if (ctx->state.inSettings && !ctx->state.inIPInput && !ctx->state.inAppMenu) {
                     printf("Debug: In settings menu.\n");
-                    selected_item = 0;
                     for (int i = 0; i < 6; ++i) {
                         sdl_tile(ctx, ctx->menu_surface, COLUMNS, ROWS, selected_item, i, (char **)settings_texts, 6, 24, 0);
                     }
                 } else if (!ctx->state.inSettings && ctx->state.inIPInput && !ctx->state.inAppMenu) {
                     printf("Debug: In IP Input menu.\n");
-                    selected_item = 0;
                     for (int i = 0; i < 15; ++i) {
                         sdl_tile(ctx, ctx->menu_surface, BIG_COL, BIG_ROW, selected_item, i, (char **)ip_input, 15, 24, 0);
                         sdl_draw_textbox(ctx, ctx->menu_surface, ctx->state.entered_ip);
                     }
                 } if (!ctx->state.inSettings && !ctx->state.inIPInput && ctx->state.inAppMenu) {
                         printf("Debug: In App selection menu.\n");
-                        selected_item = 0;
                         char **app_select = NULL;
                         int count = applist(&server, &app_select);
                         global_app_names = app_select;

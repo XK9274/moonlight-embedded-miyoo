@@ -177,11 +177,11 @@ bool vpu_decode(PDECODE_UNIT decodeUnit) {
   while (entry != NULL) {
     if ( (target_addr + entry->length) > mem_desc.virt_uaddr + STREAM_BUF_SIZE) {
       int room = mem_desc.virt_uaddr + STREAM_BUF_SIZE - target_addr;
-      memcpy((void *)target_addr, entry->data, room);
-      memcpy((void *)mem_desc.virt_uaddr, entry->data + room, entry->length - room);
+      neon_memcpy((void *)target_addr, entry->data, room);
+      neon_memcpy((void *)mem_desc.virt_uaddr, entry->data + room, entry->length - room);
       target_addr = mem_desc.virt_uaddr + entry->length - room;
     } else {
-      memcpy((void *)target_addr, entry->data, entry->length);
+      neon_memcpy((void *)target_addr, entry->data, entry->length);
       target_addr += entry->length;
     }
 

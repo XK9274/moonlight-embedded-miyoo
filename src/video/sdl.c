@@ -56,7 +56,7 @@ static int sdl_submit_decode_unit(PDECODE_UNIT decodeUnit) {
   ensure_buf_size(&ffmpeg_buffer, &ffmpeg_buffer_size, decodeUnit->fullLength + AV_INPUT_BUFFER_PADDING_SIZE);
 
   while (entry != NULL) {
-    memcpy(ffmpeg_buffer+length, entry->data, entry->length);
+    neon_memcpy(ffmpeg_buffer+length, entry->data, entry->length);
     length += entry->length;
     entry = entry->next;
   }

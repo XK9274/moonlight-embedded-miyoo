@@ -111,7 +111,7 @@ char* get_path(char* name, char* extra_data_dirs) {
   do {
     end = strstr(data_dir, ":");
     int length = end != NULL ? end - data_dir:strlen(data_dir);
-    memcpy(path, data_dir, length);
+    neon_memcpy(path, data_dir, length);
     if (path[0] == '/')
       sprintf(path+length, MOONLIGHT_PATH "/%s", name);
     else

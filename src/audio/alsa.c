@@ -40,7 +40,7 @@ static int alsa_renderer_init(int audioConfiguration, POPUS_MULTISTREAM_CONFIGUR
    * ALSA expects the order: FL-FR-RL-RR-C-LFE-SL-SR
    * We need copy the mapping locally and swap the channels around.
    */
-  memcpy(alsaMapping, opusConfig->mapping, sizeof(alsaMapping));
+  neon_memcpy(alsaMapping, opusConfig->mapping, sizeof(alsaMapping));
   if (opusConfig->channelCount >= 6) {
     alsaMapping[2] = opusConfig->mapping[4];
     alsaMapping[3] = opusConfig->mapping[5];
