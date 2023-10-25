@@ -25,6 +25,7 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
+#include "input/sdl.h"
 
 #include <stdbool.h>
 
@@ -42,6 +43,7 @@
 #define MIYOO_VERSION "1.3"
 #define TOP_BANNER "/mnt/SDCARD/App/moonlight/res/icon/top_banner.png"
 #define MOONLIGHT_FONT "/mnt/SDCARD/miyoo/app/Helvetica-Neue-2.ttf"
+#define MOONLIGHT_DIR "/mnt/SDCARD/App/moonlight"
 
 #define MAX_ITEMS 6
 #define ROWS 2
@@ -50,6 +52,7 @@
 #define BIG_COL 5
 #define BIG_ROW 5
 #define MAX_IP_TILES 15
+#define MAX_IP_LEN 16 
 
 typedef struct {
     int redraw;
@@ -59,8 +62,10 @@ typedef struct {
     int noPairStart;
     int unPairedNoti;
     int exitNow;
-    const char* entered_ip;
+    int inAppMenu;
+    char* entered_ip;
     char received_pin[5];
+    char ip_address_from_file[MAX_IP_LEN];
 } UIState;
 
 typedef struct SDLContext {
@@ -76,9 +81,11 @@ typedef struct SDLContext {
     UIState state;
 } SDLContext;
 
+extern SDLContext ctx;
+
 void sdl_init(SDLContext *ctx, int width, int height, bool fullscreen);
-void sdl_banner(SDLContext *ctx, const char *text, const char *color);
-void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int selected, int index, const char* text, int numItems);
+void sdl_banner(SDLContext *ctx, const char *format, const char *color, ...);
+void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int selected, int index, char **labels, int numItems, int font_size, int isAppSelection);
 int sdl_menu(SDLContext *ctx);
 void sdl_unpair(SDLContext *ctx, const char *IPADDR);
 void sdl_loop(SDLContext *ctx);

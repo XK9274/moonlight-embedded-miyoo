@@ -20,15 +20,22 @@
 #ifdef HAVE_SDL
 
 #include "sdl.h"
-#include "input/sdl.h"
+#include "connection.h"
 #include <Limelight.h>
 #include "util.h"
+
+SDLContext ctx;
+SERVER_DATA server;
+CONFIGURATION config;
 
 static bool done;
 static int fullscreen_flags;
 SDL_mutex *mutex;
-
 int sdlCurrentFrame, sdlNextFrame;
+int eventPending = 0;
+int pair_eval = 0;
+char **global_app_names = NULL;
+int global_app_count = 0;
 
 void sdl_base_ui(SDLContext *ctx) {
     SDL_FillRect(ctx->menu_surface, NULL, SDL_MapRGB(ctx->menu_surface->format, 40, 39, 46));
@@ -94,12 +101,15 @@ void sdl_init(SDLContext *ctx, int width, int height, bool fullscreen) {
     
     ctx->menu_surface = SDL_CreateRGBSurface(0, 640, 480, 16, 0xF800, 0x07E0, 0x001F, 0x0000);
     ctx->menu_texture = SDL_CreateTexture(ctx->renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, 640, 480);
-    sdl_base_ui(ctx);
-        
+    
     if(TTF_Init()) {
         fprintf(stderr, "Could not initialize TTF - %s\n", SDL_GetError());
         exit(1);
     }
+    
+    launchConnectRemoteThread(&server, &config, ctx);
+    sdl_base_ui(ctx);
+    sdl_menu(ctx);  
 }
 
 void cleanupSDLContext(SDLContext *ctx) {
@@ -129,6 +139,7 @@ void cleanupSDLContext(SDLContext *ctx) {
     }
 }
 
+
 void sdl_ip_input(SDLContext *ctx, SDL_Rect text_box_rect) {
     if (ctx == NULL) {
         fprintf(stderr, "Null context\n");
@@ -154,7 +165,6 @@ void sdl_ip_input(SDLContext *ctx, SDL_Rect text_box_rect) {
         TTF_CloseFont(font);
         return;
     }
-
 
     SDL_Rect text_rect;
     text_rect.x = text_box_rect.x + (text_box_rect.w - text_surface->w) / 2;
@@ -191,9 +201,17 @@ void sdl_ip_input_gui(SDLContext *ctx) {
 }
 
 
-void sdl_banner(SDLContext *ctx, const char *text, const char *color) {
+void sdl_banner(SDLContext *ctx, const char *format, const char *color, ...) {
+    printf("Entered banner\n");
     if (!ctx || !ctx->menu_surface) return;
-
+    
+    char message[256];
+    va_list args;
+    
+    va_start(args, color);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+    
     SDL_Rect rect;
     rect.x = 0;
     rect.y = 0;
@@ -203,17 +221,16 @@ void sdl_banner(SDLContext *ctx, const char *text, const char *color) {
     Uint32 bannerColor;
 
     if (strcmp(color, "green") == 0) {
-        bannerColor = SDL_MapRGB(ctx->menu_surface->format, 0, 255, 0);
+        bannerColor = SDL_MapRGB(ctx->menu_surface->format, 76, 125, 76);
     } else if (strcmp(color, "orange") == 0) {
-        bannerColor = SDL_MapRGB(ctx->menu_surface->format, 255, 165, 0);
+        bannerColor = SDL_MapRGB(ctx->menu_surface->format, 255, 182, 83);
     } else {
-        bannerColor = SDL_MapRGB(ctx->menu_surface->format, 255, 0, 0);
+        bannerColor = SDL_MapRGB(ctx->menu_surface->format, 255, 105, 97);
     }
 
     SDL_FillRect(ctx->menu_surface, &rect, bannerColor);
 
-
-    if (text) {
+    if (message[0] != '\0') {
         TTF_Font *font = TTF_OpenFont(MOONLIGHT_FONT, 26);
         if (font == NULL) {
             fprintf(stderr, "Could not load font: %s\n", TTF_GetError());
@@ -221,7 +238,7 @@ void sdl_banner(SDLContext *ctx, const char *text, const char *color) {
         }
 
         SDL_Color textColor = {255, 255, 255, 255};
-        SDL_Surface *textSurface = TTF_RenderText_Blended(font, text, textColor);
+        SDL_Surface *textSurface = TTF_RenderText_Blended(font, message, textColor);
 
         if(!textSurface) {
             fprintf(stderr, "Could not render text: %s\n", TTF_GetError());
@@ -244,72 +261,13 @@ void sdl_banner(SDLContext *ctx, const char *text, const char *color) {
     SDL_Texture* menu_texture = SDL_CreateTextureFromSurface(ctx->renderer, ctx->menu_surface);
     SDL_RenderCopy(ctx->renderer, menu_texture, NULL, NULL);
     SDL_DestroyTexture(menu_texture);
-
     SDL_RenderPresent(ctx->renderer);
-}
-
-void sdl_pair(SDLContext *ctx, const char *IPADDR) {
-    char preload_path[128], command[256];
-
-    snprintf(preload_path, sizeof(preload_path), "%s/lib/libuuid.so", MOONLIGHT_DIR);
-    snprintf(command, sizeof(command), "LD_PRELOAD=%s moonlight pair %s", preload_path, IPADDR);
-
-    FILE *fp = popen(command, "r");
-    if (fp == NULL) {
-        printf("Problem getting fp\n");
-        return;
-    }
     
-    int ret = read_and_match_output(fp, ctx, 2);
-    pclose(fp);
-
-    if (ret == 3) {
-        sdl_banner(ctx, "Successfully paired!", "green");
-        ctx->state.inIPInput = 0;
-        ctx->state.inSettings = 0;
-        ctx->state.redrawAll = 1;
-        ctx->state.noPairStart = 0;
-        printf("Problem getting fp%d\n", ctx->state.noPairStart = 0);
-        SDL_Delay(2000);
-        sdl_menu(ctx);
-    } else {
-        sdl_banner(ctx, "Failed to pair... try again", "red");
-    }
+    ctx->state.redrawAll = 0;
+    ctx->state.redraw = 0;
+    eventPending = 0;
+    printf("Exit banner\n");
 }
-
-void sdl_unpair(SDLContext *ctx, const char *IPADDR) {
-    char pairdone_path[128], cache_path[128], preload_path[128], command[256];
-
-    snprintf(pairdone_path, sizeof(pairdone_path), "%s/config/pairdone", MOONLIGHT_DIR);
-    snprintf(cache_path, sizeof(cache_path), "%s/.cache", MOONLIGHT_DIR);
-    snprintf(preload_path, sizeof(preload_path), "%s/lib/libuuid.so", MOONLIGHT_DIR);
-
-    is_file_exist_and_remove(pairdone_path);
-    is_dir_exist_and_remove(cache_path);
-    is_file_exist_and_remove("/tmp/launch");
-
-    snprintf(command, sizeof(command), "LD_PRELOAD=%s moonlight unpair %s", preload_path, IPADDR);
-
-    FILE *fp = popen(command, "r");
-    if (fp == NULL) {
-        printf("Problem getting fp\n");
-        return;
-    }
-    
-    int ret = read_and_match_output(fp, ctx, 1);
-    pclose(fp);
-
-    if (ret == 1) {
-        sdl_banner(ctx, "Successfully unpaired!", "green");
-        ctx->state.redrawAll = 1;
-        ctx->state.noPairStart = 1;
-        SDL_Delay(1000);
-        sdl_menu(ctx);
-    } else if (ret == 2) {
-        sdl_banner(ctx, "Failed to unpair... try again", "red");
-    }
-}
-
 
 void sdl_draw_textbox(SDLContext *ctx, SDL_Surface* surface, const char* message) {
     int screen_width = 640;
@@ -317,7 +275,7 @@ void sdl_draw_textbox(SDLContext *ctx, SDL_Surface* surface, const char* message
     int padding = 20;
     int box_height = 50;
     
-    const char* displayMessage = message ? message : "Default Text";
+    const char* displayMessage = message ? message : " ";
 
     int box_start_x = padding;
     int box_start_y = screen_height - box_height - padding - 210; 
@@ -356,7 +314,7 @@ void sdl_draw_textbox(SDLContext *ctx, SDL_Surface* surface, const char* message
     TTF_Quit();
 }
 
-void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int selected, int index, const char* text, int numItems) {
+void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int selected, int index, char **labels, int numItems, int font_size, int isAppSelection) {
     int screen_width = 640;
     int screen_height = 480;
     int padding = 20;
@@ -404,7 +362,7 @@ void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int 
         return;
     }
     
-    TTF_Font *font = TTF_OpenFont(MOONLIGHT_FONT, 30);
+    TTF_Font *font = TTF_OpenFont(MOONLIGHT_FONT, font_size);
     if (font == NULL) {
         fprintf(stderr, "Could not load font: %s\n", TTF_GetError());
         TTF_Quit();
@@ -413,8 +371,8 @@ void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int 
 
     SDL_Color textColor = {255, 255, 255, 0};
 
-    SDL_Surface* textSurface = TTF_RenderText_Blended(font, text, textColor);
-
+    SDL_Surface* textSurface = TTF_RenderText_Blended(font, labels[index], textColor);
+    
     SDL_Rect textRect;
     textRect.x = rect.x + (rect.w - textSurface->w) / 2;
     textRect.y = rect.y + (rect.h - textSurface->h) / 2;
@@ -429,9 +387,11 @@ void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int 
 }
 
 int sdl_menu(SDLContext *ctx) {
-    printf("Entering sdl_menu\n");
-    
     SDL_Event event;
+    
+    ctx->state.inIPInput = 0;
+    ctx->state.exitNow = 0;
+    ctx->state.inSettings = 0;
     
     ctx->state.entered_ip = strdup(" ");
     int selected_item = 0;
@@ -440,24 +400,23 @@ int sdl_menu(SDLContext *ctx) {
     
     char statusText[50] = "Status:";
     
-    if (ctx->state.noPairStart == 1) {
+    if (server.paired == 0) {
         snprintf(statusText, sizeof(statusText), "Not paired!");
     } else {
         snprintf(statusText, sizeof(statusText), "Paired!");
     }
-
-    const char* menu_texts[6] = {"Stream", "Pair", "Unpair", "Settings", "Exit", statusText};
-    const char* settings_texts[6] = {"Keybinds", "Mouse", "1", "1", "1", "Back"};
+       
+    const char* menu_texts[6] = {"Stream", "Pair", "Unpair", "Settings", "Servers", "Exit"};
+    const char* settings_texts[6] = {"Keybinds", "Mouse", " ", " ", " ", "Back"};
     const char* ip_input[15] = {"0", "1", "2", "3", "4", "5", "6" , "7", "8", "9", ".", "Exit", "Del", "Clear", "Enter"};
-
+    
     while (1) {
-        int eventPending = 0;
         while (SDL_PollEvent(&event)) {
-            eventPending = 1;
             if (event.type == SDL_QUIT) {
                 return 1;
             }
             if (event.type == SDL_KEYDOWN) {
+                eventPending = 1;
                 if (ctx->state.inIPInput) {
                     switch (event.key.keysym.sym) {
                         case SDLK_SPACE:
@@ -489,7 +448,6 @@ int sdl_menu(SDLContext *ctx) {
                                     ctx->state.inIPInput = 0;
                                     ctx->state.inSettings = 0;
                                     ctx->state.redrawAll = 1;
-                                    sdl_menu(ctx);
                                 break;
                                 case 12:
                                     if (ctx->state.entered_ip && strlen(ctx->state.entered_ip) > 0) {
@@ -512,14 +470,36 @@ int sdl_menu(SDLContext *ctx) {
                                     ctx->state.entered_ip = strdup(" ");
                                     ctx->state.redrawAll = 1;
                                 break;
-                                case 14:  // return
-                                    sdl_pair(ctx, ctx->state.entered_ip);
-                                break;
+                                case 14:
+                                    if (ctx->state.entered_ip != NULL) {
+                                        config.address = strdup(ctx->state.entered_ip);
+                                        if (config.address == NULL) {
+                                            fprintf(stderr, "Memory allocation failed for config->address\n");
+                                        }
+                                    } else {
+                                        config.address = NULL;
+                                    }
+                                    
+                                    if (config.address != NULL) {
+                                        remove_spaces(config.address);
+                                    }
+                                    
+                                    pairClient(ctx);
+                                    
+                                    if (ctx->state.entered_ip != NULL) {
+                                        free(ctx->state.entered_ip);
+                                        ctx->state.entered_ip = NULL;
+                                    }
+                                    
+                                    SDL_Delay(1000);
+                                    ctx->state.inIPInput = 0;
+                                    ctx->state.redrawAll = 1;
+                                    break;
                                 default:
                                     //noithing yet
                                 break;
                             }
-                        printf("In Settings: Pressed SPACE\n");
+                        printf("In IPInput: Pressed SPACE\n");
                         break;
                     case SDLK_BACKSPACE:
                         printf("In IPInput: Pressed BACKSPACE\n");
@@ -537,13 +517,64 @@ int sdl_menu(SDLContext *ctx) {
                         ctx->state.redrawAll = 1;
                         break;
                     case SDLK_RIGHT:
+                        printf("In IPInput: Pressed RIGHT\n");
                         selected_item = (selected_item + 1) % MAX_IP_TILES;
                         ctx->state.redrawAll = 1;
                         break;
                     default:
                         break;
                 }
-            } else if (ctx->state.inSettings) {
+            } else if (ctx->state.inAppMenu) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_SPACE:
+                        if (selected_item < global_app_count) {
+                            strcpy(config.app, global_app_names[selected_item]);
+                            printf("Selected app: %s\n", global_app_names[selected_item]);
+                            connectRemote(&server, &config, ctx);
+                            sdl_banner(ctx, "Host: %s App: %s", "orange", config.address, global_app_names[selected_item]);
+                            handleStreaming(&server, &config);
+                        }
+                        break;
+                        printf("In App: Pressed SPACE\n");
+                        break;
+                    case SDLK_BACKSPACE:
+                        printf("In App: Pressed B\n");
+                        ctx->state.inAppMenu = 0;
+                        ctx->state.redrawAll = 1;
+                        break;
+                    case SDLK_ESCAPE:
+                        printf("In App: Pressed ESCAPE\n");
+                        ctx->state.inAppMenu = 0;
+                        ctx->state.redrawAll = 1;
+                        break;
+                    case SDLK_UP:
+                        if (selected_item - COLUMNS >= 0) {
+                            selected_item -= COLUMNS;
+                            ctx->state.redrawAll = 1;
+                        }
+                        break;
+                    case SDLK_DOWN:
+                        if (selected_item + COLUMNS < global_app_count) {
+                            selected_item += COLUMNS;
+                            ctx->state.redrawAll = 1;
+                        }
+                        break;
+                    case SDLK_LEFT:
+                        if (selected_item > 0) {
+                            selected_item -= 1;
+                            ctx->state.redrawAll = 1;
+                        }
+                        break;
+                    case SDLK_RIGHT:
+                        if (selected_item < global_app_count - 1) {
+                            selected_item += 1;
+                            ctx->state.redrawAll = 1;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                } else if (ctx->state.inSettings) {
                 switch (event.key.keysym.sym) {
                     case SDLK_SPACE:
                         switch (selected_item) {
@@ -565,6 +596,7 @@ int sdl_menu(SDLContext *ctx) {
                                 case 5:
                                     ctx->state.inSettings = 0;
                                     selected_item = 0;
+                                    ctx->state.redrawAll = 1;
                                 default:
                                     break;
                             }
@@ -573,29 +605,28 @@ int sdl_menu(SDLContext *ctx) {
                     case SDLK_BACKSPACE:
                         printf("In Settings: Pressed B\n");
                         ctx->state.inSettings = 0;
-                        ctx->state.redraw = 1;
                         ctx->state.redrawAll = 1;
                         break;
                     case SDLK_ESCAPE:
                         printf("In Settings: Pressed ESCAPE\n");
                         ctx->state.inSettings = 0;
-                        ctx->state.redraw = 1;
+                        ctx->state.redrawAll = 1;
                         break;
                     case SDLK_UP:
                         selected_item = (selected_item - COLUMNS + MAX_ITEMS) % MAX_ITEMS;
-                        ctx->state.redraw = 1;
+                        ctx->state.redrawAll = 1;
                         break;
                     case SDLK_DOWN:
                         selected_item = (selected_item + COLUMNS) % MAX_ITEMS;
-                        ctx->state.redraw = 1;
+                        ctx->state.redrawAll = 1;
                         break;
                     case SDLK_LEFT:
                         selected_item = (selected_item - 1 + MAX_ITEMS) % MAX_ITEMS;
-                        ctx->state.redraw = 1;
+                        ctx->state.redrawAll = 1;
                         break;
                     case SDLK_RIGHT:
                         selected_item = (selected_item + 1) % MAX_ITEMS;
-                        ctx->state.redraw = 1;
+                        ctx->state.redrawAll = 1;
                         break;
                     default:
                         break;
@@ -605,43 +636,48 @@ int sdl_menu(SDLContext *ctx) {
                         case SDLK_SPACE:
                             switch (selected_item) {
                                 case 0:
-                                    if (ctx->state.noPairStart == 1) {
-                                        return 0;
+                                    pair_eval = pair_check(&server);
+                                    if (pair_eval == 1) {
+                                        sdl_banner(ctx, "You must pair first!", "red");
+                                        break;
                                     } else {
-                                        sdl_banner(ctx, "Pair your device before trying to stream!", "orange");
-                                        // ctx->state.redrawAll = 1;
-                                        // ctx->state.redraw = 1;
+                                        ctx->state.redraw = 1;
+                                        ctx->state.redrawAll = 1;
+                                        selected_item = 0;
+                                        ctx->state.inAppMenu = 1;
+                                        ctx->state.inSettings = 0;
+                                        ctx->state.inIPInput = 0;
                                     }
                                     break;
                                 case 1:
                                     selected_item = 0;
                                     ctx->state.inIPInput = 1;
+                                    ctx->state.inSettings = 0;
                                     ctx->state.redrawAll = 1;
                                     ctx->state.redraw = 1;
                                     break;
                                 case 2:
                                     sdl_banner(ctx, "Please wait.... Unpairing", "orange");
-                                    sdl_unpair(ctx, "192.168.1.84");
+                                    unPairClient(ctx);
                                     break;
                                 case 3:
-                                    ctx->state.redraw = 1;
-                                    ctx->state.redrawAll = 1;
-                                    selected_item = 0;
-                                    ctx->state.inSettings = 1;
+                                    sdl_banner(ctx, "Not active yet", "orange");
+                                    //settings button
+                                    // ctx->state.redraw = 1;
+                                    // ctx->state.redrawAll = 1;
+                                    // selected_item = 0;
+                                    // ctx->state.inSettings = 1;
+                                    // ctx->state.inIPInput = 0;
                                     break;
                                 case 4:
-                                    cleanupSDLContext(ctx);
-                                    ctx->state.exitNow = 1;
-                                    exit(-1);
+                                    sdl_banner(ctx, "Not active yet", "orange");
+                                    // servers button
                                     break;
                                 case 5:
-                                    sdl_banner(ctx, "Not active yet", "orange");
-                                    ctx->state.redraw = 0;
-                                    ctx->state.redrawAll = 0;
+                                    ctx->state.exitNow = 1;
                                 default:
                                     break;
                             }
-                            ctx->state.redraw = 1;
                             break;
                         case SDLK_BACKSPACE:
                             return 1;
@@ -651,22 +687,18 @@ int sdl_menu(SDLContext *ctx) {
                             break;
                         case SDLK_UP:
                             selected_item = (selected_item - COLUMNS + MAX_ITEMS) % MAX_ITEMS;
-                            ctx->state.redraw = 1;
                             ctx->state.redrawAll = 1;
                             break;
                         case SDLK_DOWN:
                             selected_item = (selected_item + COLUMNS) % MAX_ITEMS;
-                            ctx->state.redraw = 1;
                             ctx->state.redrawAll = 1;
                             break;
                         case SDLK_LEFT:
                             selected_item = (selected_item - 1 + MAX_ITEMS) % MAX_ITEMS;
-                            ctx->state.redraw = 1;
                             ctx->state.redrawAll = 1;
                             break;
                         case SDLK_RIGHT:
                             selected_item = (selected_item + 1) % MAX_ITEMS;
-                            ctx->state.redraw = 1;
                             ctx->state.redrawAll = 1;
                             break;
                         default:
@@ -677,37 +709,46 @@ int sdl_menu(SDLContext *ctx) {
         }
             
         if (eventPending || ctx->state.redraw) {
-            // printf("Debug: Event pending or redraw required.\n");
+            printf("Debug: eventPending = %d, ctx->state.redraw = %d, ctx->state.redrawAll = %d\n", eventPending, ctx->state.redraw, ctx->state.redrawAll);
+            printf("Debug: Event pending or redraw required.\n");
             if (ctx->state.redrawAll) {
-                // printf("Debug: Redrawing entire base UI.\n");
+                printf("Debug: Redrawing entire base UI.\n");
                 sdl_base_ui(ctx);
                 ctx->state.redrawAll = 0;
-                
-                if (ctx->state.noPairStart == 1) {
-                    // printf("Debug: Device not paired.\n");
-                    sdl_banner(ctx, "This device is not paired!", "red");
-                    ctx->state.noPairStart = 0;
-                    ctx->state.redrawAll = 0;
-                    ctx->state.redraw = 0;
-                }
 
-                if (!ctx->state.inSettings && !ctx->state.inIPInput) {
-                    // printf("Debug: In main menu.\n");
-                    for (int i = 0; i < MAX_ITEMS; ++i) {
-                        sdl_tile(ctx, ctx->menu_surface, COLUMNS, ROWS, selected_item, i, menu_texts[i], 6);
+                if (!ctx->state.inSettings && !ctx->state.inIPInput && !ctx->state.inAppMenu) {
+                    printf("Debug: In main menu.\n");
+                    selected_item = 0;
+                    for (int i = 0; i < 6; ++i) {
+                        sdl_tile(ctx, ctx->menu_surface, COLUMNS, ROWS, selected_item, i, (char **)menu_texts, 6, 24, 0);
                     }
-                } else if (ctx->state.inSettings && !ctx->state.inIPInput) {
-                    // printf("Debug: In settings menu.\n");
-                    for (int i = 0; i < MAX_ITEMS; ++i) {
-                        sdl_tile(ctx, ctx->menu_surface, COLUMNS, ROWS, selected_item, i, settings_texts[i], 6);
+                } else if (ctx->state.inSettings && !ctx->state.inIPInput && !ctx->state.inAppMenu) {
+                    printf("Debug: In settings menu.\n");
+                    selected_item = 0;
+                    for (int i = 0; i < 6; ++i) {
+                        sdl_tile(ctx, ctx->menu_surface, COLUMNS, ROWS, selected_item, i, (char **)settings_texts, 6, 24, 0);
                     }
-                } else if (ctx->state.inIPInput) {
-                    // printf("Debug: In IP Input menu.\n");
-                    for (int i = 0; i < MAX_IP_TILES; ++i) {
-                        sdl_tile(ctx, ctx->menu_surface, BIG_COL, BIG_ROW, selected_item, i, ip_input[i], 15);
+                } else if (!ctx->state.inSettings && ctx->state.inIPInput && !ctx->state.inAppMenu) {
+                    printf("Debug: In IP Input menu.\n");
+                    selected_item = 0;
+                    for (int i = 0; i < 15; ++i) {
+                        sdl_tile(ctx, ctx->menu_surface, BIG_COL, BIG_ROW, selected_item, i, (char **)ip_input, 15, 24, 0);
                         sdl_draw_textbox(ctx, ctx->menu_surface, ctx->state.entered_ip);
                     }
-                }
+                } if (!ctx->state.inSettings && !ctx->state.inIPInput && ctx->state.inAppMenu) {
+                        printf("Debug: In App selection menu.\n");
+                        selected_item = 0;
+                        char **app_select = NULL;
+                        int count = applist(&server, &app_select);
+                        global_app_names = app_select;
+                        global_app_count = count;
+
+                        if (count > 0) {
+                            for (int i = 0; i < count; ++i) {
+                                sdl_tile(ctx, ctx->menu_surface, COLUMNS, ROWS, selected_item, i, app_select, count, 16, 1);
+                            }
+                        }
+                    }
                 
                 SDL_UpdateTexture(ctx->menu_texture, NULL, ctx->menu_surface->pixels, ctx->menu_surface->pitch);
                 SDL_RenderCopy(ctx->renderer, ctx->menu_texture, NULL, NULL);
@@ -715,26 +756,25 @@ int sdl_menu(SDLContext *ctx) {
                 
                 ctx->state.redraw = 0;
                 ctx->state.redrawAll = 0;
+                eventPending = 0;
             }
             
-        if (ctx->state.exitNow) {
-            break;
+            if (ctx->state.exitNow) {
+                break;
+            }
         }
-        
-        }
-        
+
         SDL_Delay(25);
     }
 
+    // printf("Broke out of main?!? \n");
     SDL_FreeSurface(ctx->menu_surface);
     TTF_Quit();
-    // printf("Destroyed menu_texture\n");
     SDL_DestroyMutex(mutex);
     return 0;
 }
 
-void sdl_splash(SDLContext *ctx) {
-    // printf("Entering sdl_menu\n");
+void sdl_splash(SDLContext *ctx) { // not used currently
 
     SDL_Event event;
 
@@ -747,10 +787,8 @@ void sdl_splash(SDLContext *ctx) {
     if (!menu_surface) {
         fprintf(stderr, "SDL: could not create surface - %s\n", SDL_GetError());
         exit(1);
-    } else {
-        // printf("Successfully created menu_surface\n");
     }
-
+    
     SDL_FillRect(menu_surface, NULL, SDL_MapRGB(menu_surface->format, 64, 64, 64));
     SDL_Texture* menu_texture = NULL;
 
@@ -816,8 +854,9 @@ cleanup:
 
 void sdl_loop(SDLContext *ctx) {
   SDL_Event event;
-
   SDL_SetRelativeMouseMode(SDL_TRUE);
+  done = 0;
+  printf("Entered Loop\n");
 
   while(!done && SDL_WaitEvent(&event)) {
     if (ctx->state.exitNow == 1) {
@@ -866,6 +905,7 @@ void sdl_loop(SDLContext *ctx) {
   cleanupSDLContext(ctx);
   SDL_DestroyWindow(ctx->window);
   SDL_Quit();
+  exit(-1);
 }
 
 #endif /* HAVE_SDL */

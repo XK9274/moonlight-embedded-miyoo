@@ -1,3 +1,6 @@
+#ifndef CONFIG_H__
+#define CONFIG_H__
+
 /*
  * This file is part of Moonlight Embedded.
  *
@@ -50,7 +53,13 @@ typedef struct _CONFIGURATION {
   unsigned short port;
 } CONFIGURATION, *PCONFIGURATION;
 
+#define MOONLIGHT_CONF "/mnt/SDCARD/App/moonlight/config/moonlight.conf"
+
+extern CONFIGURATION config;
 extern bool inputAdded;
 
+void config_default();
 bool config_file_parse(char* filename, PCONFIGURATION config);
 void config_parse(int argc, char* argv[], PCONFIGURATION config);
+
+#endif

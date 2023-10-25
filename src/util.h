@@ -22,11 +22,7 @@
 #include <stdio.h>
 #include "sdl.h"
 
-#define MOONLIGHT_DIR "/mnt/SDCARD/App/moonlight"
-
-int read_and_match_output(FILE *fp, SDLContext *ctx, int operation_type);
-void unpair_callback(SDLContext *ctx, const char *line);
-void pair_callback(SDLContext *ctx, const char *buffer);
+void remove_spaces(char *str);
 void is_file_exist_and_remove(const char *filepath);
 void is_dir_exist_and_remove(const char *dirpath);
 int write_bool(char *path, bool val);
