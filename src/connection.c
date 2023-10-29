@@ -310,10 +310,6 @@ void pairClient(SDLContext *ctx) {
       // server.paired = 1;
       ctx->state.redrawAll = 1;
       ctx->state.inIPInput = 0;
-      sdl_banner(ctx, "Failed: *s", "red", gs_error);
-    } else {
-      printf("Successfully paired\n");
-      sdl_banner(ctx, "Successfully paired!", "green");
     }
 }
 
@@ -333,7 +329,6 @@ void unPairClient(SDLContext *ctx) {
         sdl_banner(ctx, "Failed: *s", "red", gs_error);
     } else {
         // server.paired = 0;
-        server.paired = 0;
         snprintf(pairdone_path, sizeof(pairdone_path), "%s/config/pairdone", MOONLIGHT_DIR);
         snprintf(cache_path, sizeof(cache_path), "%s/.cache", MOONLIGHT_DIR);
 

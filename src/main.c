@@ -43,6 +43,7 @@ int main(int argc, char* argv[]) {
         free(ctx.state.entered_ip);
         ctx.state.entered_ip = NULL;
     }
+
     
     return 0;
 }
