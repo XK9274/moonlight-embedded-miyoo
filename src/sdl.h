@@ -76,6 +76,7 @@ typedef struct SDLContext {
     SDL_mutex *mutex;
     SDL_Surface *menu_surface;
     SDL_Texture *menu_texture;
+    SDL_Surface* cached_top_banner;
     TTF_Font *font;
     int sdlCurrentFrame, sdlNextFrame;
     bool fullscreen;

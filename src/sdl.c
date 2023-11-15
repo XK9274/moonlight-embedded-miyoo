@@ -43,26 +43,25 @@ SDL_mutex *mutex;
 int sdlCurrentFrame, sdlNextFrame;
 int eventPending = 0;
 int pair_eval = 0;
-const char **global_app_names = NULL;
+char **global_app_names = NULL;
 int global_app_count = 0;
 
 void sdl_base_ui(SDLContext *ctx) {
     SDL_FillRect(ctx->menu_surface, NULL, SDL_MapRGB(ctx->menu_surface->format, 0, 0, 0));
 
-    SDL_Surface* png_surface = IMG_Load(TOP_BANNER);
-    if (!png_surface) {
-        fprintf(stderr, "Could not load PNG image: %s\n", IMG_GetError());
-    } else {
-        int x_position = (ctx->menu_surface->w - png_surface->w) / 2;
+    if (ctx->cached_top_banner) {
+        printf("Using cached UI \n");
+        int x_position = (ctx->menu_surface->w - ctx->cached_top_banner->w) / 2;
 
         SDL_Rect dest_rect;
         dest_rect.x = x_position;
         dest_rect.y = 0;
-        dest_rect.w = png_surface->w;
-        dest_rect.h = png_surface->h;
+        dest_rect.w = ctx->cached_top_banner->w;
+        dest_rect.h = ctx->cached_top_banner->h;
 
-        SDL_BlitSurface(png_surface, NULL, ctx->menu_surface, &dest_rect);
-        SDL_FreeSurface(png_surface);
+        SDL_BlitSurface(ctx->cached_top_banner, NULL, ctx->menu_surface, &dest_rect);
+    } else {
+        fprintf(stderr, "Error loading UI - %s\n", SDL_GetError());
     }
 }
 
@@ -114,6 +113,11 @@ void sdl_init(SDLContext *ctx, int width, int height, bool fullscreen) {
     if(TTF_Init()) {
         fprintf(stderr, "Could not initialize TTF - %s\n", SDL_GetError());
         exit(1);
+    }
+    
+    ctx->cached_top_banner = IMG_Load(TOP_BANNER);
+    if (!ctx->cached_top_banner) {
+        fprintf(stderr, "Could not load PNG image: %s\n", IMG_GetError());
     }
     
     launchConnectRemoteThread(&server, &config, ctx);
@@ -417,6 +421,7 @@ void sdl_tile(SDLContext *ctx, SDL_Surface* surface, int columns, int rows, int 
 void handle_ip_input_space(SDL_Event *event, SDLContext *ctx, int *selected_item);
 void handle_app_menu_input(SDL_Event *event, SDLContext *ctx, int *selected_item);
 void handle_settings_input(SDL_Event *event, SDLContext *ctx, int *selected_item);
+void handle_ip_input(SDL_Event *event, SDLContext *ctx, int *selected_item);
 void handle_main_menu_input(SDL_Event *event, SDLContext *ctx, int *selected_item, const char *menu_texts[]);
 void handle_backspace_input(SDLContext *ctx);
 void handlePairClient(SDLContext *ctx);
@@ -425,34 +430,7 @@ void handle_key_input(SDL_Event *event, SDLContext *ctx, int *selected_item, con
                       const char *settings_texts[], const char *ip_input[]) {
     eventPending = 1;
     if (ctx->state.inIPInput) {
-        switch (event->key.keysym.sym) {
-            case SDLK_SPACE:
-                handle_ip_input_space(event, ctx, selected_item);
-                break;
-            case SDLK_BACKSPACE:
-                *selected_item = 0;
-                ctx->state.inIPInput = 0;
-                ctx->state.redrawAll = 1;
-                break;
-            case SDLK_UP:
-                *selected_item = (*selected_item - BIG_ROW + MAX_IP_TILES) % MAX_IP_TILES;
-                ctx->state.redrawAll = 1;
-                break;
-            case SDLK_DOWN:
-                *selected_item = (*selected_item + BIG_ROW) % MAX_IP_TILES;
-                ctx->state.redrawAll = 1;
-                break;
-            case SDLK_LEFT:
-                *selected_item = (*selected_item - 1 + MAX_IP_TILES) % MAX_IP_TILES;
-                ctx->state.redrawAll = 1;
-                break;
-            case SDLK_RIGHT:
-                *selected_item = (*selected_item + 1) % MAX_IP_TILES;
-                ctx->state.redrawAll = 1;
-                break;
-            default:
-                break;
-        }
+        handle_ip_input(event, ctx, selected_item);
     } else if (ctx->state.inAppMenu) {
         handle_app_menu_input(event, ctx, selected_item);
     } else if (ctx->state.inSettings) {
@@ -467,6 +445,11 @@ void handle_ip_input_space(SDL_Event *event, SDLContext *ctx, int *selected_item
         case 0 ... 9: {
             char new_ip[64];
             snprintf(new_ip, sizeof(new_ip), "%s%d", ctx->state.entered_ip, *selected_item);
+            
+            if (ctx->state.entered_ip != NULL) {
+                free(ctx->state.entered_ip);
+            }
+            
             ctx->state.entered_ip = strdup(new_ip);
             ctx->state.redrawAll = 1;
         }
@@ -474,6 +457,11 @@ void handle_ip_input_space(SDL_Event *event, SDLContext *ctx, int *selected_item
         case 10: {
             char new_ip[64];
             snprintf(new_ip, sizeof(new_ip), "%s.", ctx->state.entered_ip);
+            
+            if (ctx->state.entered_ip != NULL) {
+                free(ctx->state.entered_ip);
+            }
+            
             ctx->state.entered_ip = strdup(new_ip);
             ctx->state.redrawAll = 1;
         }
@@ -519,7 +507,7 @@ void handle_redraw(SDLContext *ctx, int *selected_item, const char *menu_texts[]
                 sdl_draw_textbox(ctx, ctx->menu_surface, ctx->state.entered_ip);
             }
         } if (!ctx->state.inSettings && !ctx->state.inIPInput && ctx->state.inAppMenu) {
-                const char **app_select = NULL;
+                char **app_select = NULL;
                 int count = applist(&server, &app_select);
                 global_app_names = app_select;
                 global_app_count = count;
@@ -537,6 +525,37 @@ void handle_redraw(SDLContext *ctx, int *selected_item, const char *menu_texts[]
 
         ctx->state.redrawAll = 0;
         eventPending = 0;
+    }
+}
+
+void handle_ip_input(SDL_Event *event, SDLContext *ctx, int *selected_item) {
+    switch (event->key.keysym.sym) {
+        case SDLK_SPACE:
+            handle_ip_input_space(event, ctx, selected_item);
+            break;
+        case SDLK_BACKSPACE:
+            *selected_item = 0;
+            ctx->state.inIPInput = 0;
+            ctx->state.redrawAll = 1;
+            break;
+        case SDLK_UP:
+            *selected_item = (*selected_item - BIG_ROW + MAX_IP_TILES) % MAX_IP_TILES;
+            ctx->state.redrawAll = 1;
+            break;
+        case SDLK_DOWN:
+            *selected_item = (*selected_item + BIG_ROW) % MAX_IP_TILES;
+            ctx->state.redrawAll = 1;
+            break;
+        case SDLK_LEFT:
+            *selected_item = (*selected_item - 1 + MAX_IP_TILES) % MAX_IP_TILES;
+            ctx->state.redrawAll = 1;
+            break;
+        case SDLK_RIGHT:
+            *selected_item = (*selected_item + 1) % MAX_IP_TILES;
+            ctx->state.redrawAll = 1;
+            break;
+        default:
+            break;
     }
 }
 
@@ -674,10 +693,10 @@ void handle_main_menu_input(SDL_Event *event, SDLContext *ctx, int *selected_ite
                     unPairClient(ctx);
                     break;
                 case 3:
-                    sdl_banner(ctx, "Not implemented yet", "orange");
+                    sdl_banner(ctx, "Not implemented yet", "orange"); // settings
                     break;
                 case 4:
-                    sdl_banner(ctx, "Not implemented yet", "orange");
+                    sdl_banner(ctx, "Not implemented yet", "orange"); // cached servers
                     break;
                 case 5:
                     ctx->state.exitNow = 1;
@@ -789,137 +808,59 @@ int sdl_menu(SDLContext *ctx) {
 }
 
 void sdl_loop(SDLContext *ctx) {
-  SDL_Event event;
-  SDL_SetRelativeMouseMode(SDL_TRUE);
-  done = 0;
-  // printf("Entered Loop\n");
-
-  while(!done && SDL_WaitEvent(&event)) {
-    if (ctx->state.exitNow == 1) {
-        done = true;
-        break;
-    }
-
-    switch (sdlinput_handle_event(ctx->window, &event)) {
-    case SDL_QUIT_APPLICATION:
-      done = true;
-      break;
-    case SDL_TOGGLE_FULLSCREEN:
-      fullscreen_flags ^= SDL_WINDOW_FULLSCREEN;
-      SDL_SetWindowFullscreen(ctx->window, fullscreen_flags);
-      break;
-    case SDL_MOUSE_GRAB:
-      SDL_ShowCursor(SDL_ENABLE);
-      SDL_SetRelativeMouseMode(SDL_TRUE);
-      break;
-    case SDL_MOUSE_UNGRAB:
-      SDL_SetRelativeMouseMode(SDL_FALSE);
-      SDL_ShowCursor(SDL_DISABLE);
-      break;
-    default:
-      if (event.type == SDL_QUIT)
-        done = true;
-      else if (event.type == SDL_USEREVENT) {
-        if (event.user.code == SDL_CODE_FRAME) {
-          if (++sdlCurrentFrame <= sdlNextFrame - SDL_BUFFER_FRAMES) {
-            //Skip frame
-          } else if (SDL_LockMutex(mutex) == 0) {
-            Uint8** data = ((Uint8**) event.user.data1);
-            int* linesize = ((int*) event.user.data2);
-            SDL_UpdateYUVTexture(ctx->bmp, NULL, data[0], linesize[0], data[1], linesize[1], data[2], linesize[2]);
-            SDL_UnlockMutex(mutex);
-            SDL_RenderClear(ctx->renderer);
-            SDL_RenderCopy(ctx->renderer, ctx->bmp, NULL, NULL);
-            SDL_RenderPresent(ctx->renderer);
-          } else
-            fprintf(stderr, "Couldn't lock mutex\n");
-        }
-      }
-    }
-  }
-
-// quitRemote(&server, &config, ctx);
-printf("EXIT LOOP\n");
-cleanupSDLContext(ctx);
-}
-
-
-void sdl_splash(SDLContext *ctx) { // not used currently
-
     SDL_Event event;
+    SDL_SetRelativeMouseMode(SDL_TRUE);
+    done = 0;
+    // printf("Entered Loop\n");
 
-    Uint32 rmask = 0xF800;
-    Uint32 gmask = 0x07E0;
-    Uint32 bmask = 0x001F;
-    Uint32 amask = 0x0000;
-
-    SDL_Surface* menu_surface = SDL_CreateRGBSurface(0, 640, 480, 16, rmask, gmask, bmask, amask);
-    if (!menu_surface) {
-        fprintf(stderr, "SDL: could not create surface - %s\n", SDL_GetError());
-        exit(1);
-    }
-    
-    SDL_FillRect(menu_surface, NULL, SDL_MapRGB(menu_surface->format, 64, 64, 64));
-    SDL_Texture* menu_texture = NULL;
-
-    const char* image_path = SPLASH_PATH;
-    int nextFrameNumber = 0;
-
-    while (1) {
-        char filename[256];
-        snprintf(filename, sizeof(filename), "%s/frame%04d.png", image_path, nextFrameNumber);
-        SDL_Surface* png_surface = IMG_Load(filename);
-
-        if (!png_surface) {
-            fprintf(stderr, "Could not load PNG image: %s\n", IMG_GetError());
+    while (!done && SDL_WaitEvent(&event)) {
+        if (ctx->state.exitNow == 1) {
+            done = true;
             break;
         }
 
-        SDL_BlitSurface(png_surface, NULL, menu_surface, NULL);
-        SDL_FreeSurface(png_surface);
-
-        if (!menu_texture) {
-            menu_texture = SDL_CreateTextureFromSurface(ctx->renderer, menu_surface);
-        } else {
-            SDL_UpdateTexture(menu_texture, NULL, menu_surface->pixels, menu_surface->pitch);
-        }
-
-        nextFrameNumber++;
-
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                printf("Received SDL_QUIT event\n");
-                goto cleanup;
-            }
-            if (event.type == SDL_KEYDOWN) {
-                switch (event.key.keysym.sym) {
-                    case SDLK_a:
-                        printf("Pressed A\n");
-                        break;
-                    case SDLK_b:
-                        printf("Pressed B\n");
-                        break;
-                    case SDLK_ESCAPE:
-                        printf("Pressed ESCAPE\n");
-                        goto cleanup;
+        switch (sdlinput_handle_event(ctx->window, &event)) {
+            case SDL_QUIT_APPLICATION:
+                done = true;
+                break;
+            case SDL_TOGGLE_FULLSCREEN:
+                fullscreen_flags ^= SDL_WINDOW_FULLSCREEN;
+                SDL_SetWindowFullscreen(ctx->window, fullscreen_flags);
+                break;
+            case SDL_MOUSE_GRAB:
+                SDL_ShowCursor(SDL_ENABLE);
+                SDL_SetRelativeMouseMode(SDL_TRUE);
+                break;
+            case SDL_MOUSE_UNGRAB:
+                SDL_SetRelativeMouseMode(SDL_FALSE);
+                SDL_ShowCursor(SDL_DISABLE);
+                break;
+            default:
+                if (event.type == SDL_QUIT) {
+                    done = true;
+                } else if (event.type == SDL_USEREVENT) {
+                    if (event.user.code == SDL_CODE_FRAME) {
+                        if (++sdlCurrentFrame <= sdlNextFrame - SDL_BUFFER_FRAMES) {
+                            // Skip frame
+                        } else if (SDL_LockMutex(mutex) == 0) {
+                            Uint8** data = ((Uint8**) event.user.data1);
+                            int* linesize = ((int*) event.user.data2);
+                            SDL_UpdateYUVTexture(ctx->bmp, NULL, data[0], linesize[0], data[1], linesize[1], data[2], linesize[2]);
+                            SDL_UnlockMutex(mutex);
+                            SDL_RenderClear(ctx->renderer);
+                            SDL_RenderCopy(ctx->renderer, ctx->bmp, NULL, NULL);
+                            SDL_RenderPresent(ctx->renderer);
+                        } else {
+                            fprintf(stderr, "Couldn't lock mutex\n");
+                        }
+                    }
                 }
-            }
         }
-
-        if (menu_texture) {
-            SDL_RenderCopy(ctx->renderer, menu_texture, NULL, NULL);
-            SDL_RenderPresent(ctx->renderer);
-        }
-
-        SDL_Delay(30);
     }
 
-cleanup:
-    SDL_FreeSurface(menu_surface);
-    if (menu_texture) {
-        SDL_DestroyTexture(menu_texture);
-    }
-    printf("Destroyed menu_texture\n");
+    // quitRemote(&server, &config, ctx);
+    printf("EXIT LOOP\n");
+    cleanupSDLContext(ctx);
 }
 
 #endif /* HAVE_SDL */
