@@ -16,6 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with Moonlight; if not, see <http://www.gnu.org/licenses/>.
  */
+ 
+ /*
+ 
+ todo
+ fix memory leak in menu
+ fix ip input box default text
+ add settings menu
+ add servers history/quick connect
+ */
 
 #ifdef HAVE_SDL
 
@@ -38,7 +47,7 @@ const char **global_app_names = NULL;
 int global_app_count = 0;
 
 void sdl_base_ui(SDLContext *ctx) {
-    SDL_FillRect(ctx->menu_surface, NULL, SDL_MapRGB(ctx->menu_surface->format, 40, 39, 46));
+    SDL_FillRect(ctx->menu_surface, NULL, SDL_MapRGB(ctx->menu_surface->format, 0, 0, 0));
 
     SDL_Surface* png_surface = IMG_Load(TOP_BANNER);
     if (!png_surface) {
@@ -157,9 +166,7 @@ void sdl_ip_input(SDLContext *ctx, SDL_Rect text_box_rect) {
     }
 
     const char *text_to_render = ctx->state.entered_ip;
-    if (text_to_render == NULL) {
-        text_to_render = "Enter IP";
-    }
+    text_to_render = "Enter IP";
 
     SDL_Color text_color = {255, 255, 255, 0};
     SDL_Surface *text_surface = TTF_RenderText_Blended(font, text_to_render, text_color);
@@ -769,8 +776,6 @@ int sdl_menu(SDLContext *ctx) {
         }
 
         if (eventPending) {
-            // printf("Debug: eventPending = %d, ctx->state.redrawAll = %d\n", eventPending, ctx->state.redrawAll);
-            // printf("Debug: Event pending or redraw required.\n");
             handle_redraw(ctx, &selected_item, menu_texts, settings_texts, ip_input);
             if (ctx->state.exitNow) {
                 break;
