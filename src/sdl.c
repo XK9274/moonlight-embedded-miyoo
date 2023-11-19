@@ -813,48 +813,47 @@ void sdl_loop(SDLContext *ctx) {
     done = 0;
     // printf("Entered Loop\n");
 
-    while (!done && SDL_WaitEvent(&event)) {
+    while(!done && SDL_WaitEvent(&event)) {
         if (ctx->state.exitNow == 1) {
             done = true;
             break;
         }
 
-        switch (sdlinput_handle_event(ctx->window, &event)) {
-            case SDL_QUIT_APPLICATION:
+    switch (sdlinput_handle_event(ctx->window, &event)) {
+        case SDL_QUIT_APPLICATION:
+              done = true;
+              break;
+        case SDL_TOGGLE_FULLSCREEN:
+              fullscreen_flags ^= SDL_WINDOW_FULLSCREEN;
+              SDL_SetWindowFullscreen(ctx->window, fullscreen_flags);
+              break;
+        case SDL_MOUSE_GRAB:
+              SDL_ShowCursor(SDL_ENABLE);
+              SDL_SetRelativeMouseMode(SDL_TRUE);
+              break;
+        case SDL_MOUSE_UNGRAB:
+                  SDL_SetRelativeMouseMode(SDL_FALSE);
+                  SDL_ShowCursor(SDL_DISABLE);
+                  break;
+        default:
+          if (event.type == SDL_QUIT)
                 done = true;
-                break;
-            case SDL_TOGGLE_FULLSCREEN:
-                fullscreen_flags ^= SDL_WINDOW_FULLSCREEN;
-                SDL_SetWindowFullscreen(ctx->window, fullscreen_flags);
-                break;
-            case SDL_MOUSE_GRAB:
-                SDL_ShowCursor(SDL_ENABLE);
-                SDL_SetRelativeMouseMode(SDL_TRUE);
-                break;
-            case SDL_MOUSE_UNGRAB:
-                SDL_SetRelativeMouseMode(SDL_FALSE);
-                SDL_ShowCursor(SDL_DISABLE);
-                break;
-            default:
-                if (event.type == SDL_QUIT) {
-                    done = true;
-                } else if (event.type == SDL_USEREVENT) {
-                    if (event.user.code == SDL_CODE_FRAME) {
-                        if (++sdlCurrentFrame <= sdlNextFrame - SDL_BUFFER_FRAMES) {
-                            // Skip frame
-                        } else if (SDL_LockMutex(mutex) == 0) {
-                            Uint8** data = ((Uint8**) event.user.data1);
-                            int* linesize = ((int*) event.user.data2);
-                            SDL_UpdateYUVTexture(ctx->bmp, NULL, data[0], linesize[0], data[1], linesize[1], data[2], linesize[2]);
-                            SDL_UnlockMutex(mutex);
-                            SDL_RenderClear(ctx->renderer);
-                            SDL_RenderCopy(ctx->renderer, ctx->bmp, NULL, NULL);
-                            SDL_RenderPresent(ctx->renderer);
-                        } else {
-                            fprintf(stderr, "Couldn't lock mutex\n");
-                        }
-                    }
+          else if (event.type == SDL_USEREVENT) {
+                if (event.user.code == SDL_CODE_FRAME) {
+                if (++sdlCurrentFrame <= sdlNextFrame - SDL_BUFFER_FRAMES) {
+                    //Skip frame
+                } else if (SDL_LockMutex(mutex) == 0) {
+                    Uint8** data = ((Uint8**) event.user.data1);
+                    int* linesize = ((int*) event.user.data2);
+                    SDL_UpdateYUVTexture(ctx->bmp, NULL, data[0], linesize[0], data[1], linesize[1], data[2], linesize[2]);
+                    SDL_UnlockMutex(mutex);
+                    SDL_RenderClear(ctx->renderer);
+                    SDL_RenderCopy(ctx->renderer, ctx->bmp, NULL, NULL);
+                    SDL_RenderPresent(ctx->renderer);
+                } else
+                    fprintf(stderr, "Couldn't lock mutex\n");
                 }
+          }
         }
     }
 
